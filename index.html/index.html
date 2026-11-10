@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pokédex Search & Compare</title>
+<style>
+:root{--bg:#f4f5f8;--card:#fff;--ink:#1c2030;--mute:#6b7186;--line:#e2e5ee;--accent:#e63946;--a:#3b82f6;--b:#f59e0b}
+@media (prefers-color-scheme:dark){:root{--bg:#12141c;--card:#1c1f2b;--ink:#eceef5;--mute:#98a0b8;--line:#2d3142}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:20px 16px 8px;max-width:1100px;margin:auto}
+h1{margin:0 0 12px;font-size:26px}
+h1 span{color:var(--accent)}
+.tabs{display:flex;gap:8px;margin-bottom:12px}
+.tab{padding:8px 16px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
+.tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+main{max-width:1100px;margin:auto;padding:0 16px 60px}
+.controls{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+input,select{padding:9px 12px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--ink);font:inherit}
+#q{flex:1 1 220px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px;cursor:pointer;position:relative;transition:transform .1s}
+.card:hover{transform:translateY(-2px)}
+.card .id{color:var(--mute);font-size:12px}
+.card .nm{font-weight:650;margin:2px 0 6px}
+.card img,.ph{width:96px;height:96px;display:block;margin:0 auto 6px;image-rendering:auto}
+.ph{border-radius:50%;opacity:.25}
+.chips{display:flex;gap:4px;flex-wrap:wrap}
+.chip{color:#fff;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;text-shadow:0 1px 1px #0004}
+.tot{position:absolute;top:10px;right:12px;font-size:12px;color:var(--mute)}
+.card .cmp{margin-top:8px;width:100%;padding:5px;border-radius:8px;border:1px solid var(--line);background:none;color:var(--ink);cursor:pointer;font:inherit;font-size:12px}
+.card .cmp.sel{background:var(--a);color:#fff;border-color:var(--a)}
+.card .cmp.sel.b{background:var(--b);border-color:var(--b)}
+.empty{color:var(--mute);padding:40px;text-align:center}
+.bar{display:grid;grid-template-columns:70px 40px 1fr;gap:8px;align-items:center;margin:6px 0}
+.bar i{display:block;height:10px;border-radius:5px;background:var(--accent)}
+.track{background:var(--line);border-radius:5px;height:10px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+.pickers{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.pickers select{width:100%}
+.hd{display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.hd img{width:72px;height:72px}
+.row{display:grid;grid-template-columns:1fr 70px 1fr;gap:10px;align-items:center;margin:8px 0}
+.row .lbl{text-align:center;color:var(--mute);font-size:13px}
+.side{display:flex;align-items:center;gap:8px}
+.side.l{flex-direction:row-reverse}
+.side .tr{flex:1;background:var(--line);height:12px;border-radius:6px;overflow:hidden;display:flex}
+.side.l .tr{justify-content:flex-end}
+.side .tr i{display:block;height:100%}
+.side b{min-width:34px;text-align:center}
+.side.l b{text-align:center}
+.win{outline:2px solid currentColor;border-radius:6px;padding:0 4px}
+.A{color:var(--a)}.B{color:var(--b)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.seg button{padding:7px 14px;border:0;background:var(--card);color:var(--ink);cursor:pointer;font:inherit}
+.seg button.on{background:var(--ink);color:var(--bg)}
+.dlg{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;padding:16px;z-index:9}
+.dlg.show{display:flex}
+.dlg .box{background:var(--card);border-radius:16px;max-width:460px;width:100%;padding:20px;max-height:90vh;overflow:auto}
+.dlg .x{float:right;border:0;background:none;color:var(--mute);font-size:22px;cursor:pointer}
+svg text{fill:var(--mute);font-size:11px}
+.hint{color:var(--mute);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <h1>Pok<span>é</span>dex <small class="hint" id="count"></small></h1>
+  <div class="tabs">
+    <button class="tab on" data-t="browse">Browse</button>
+    <button class="tab" data-t="compare">Compare</button>
+  </div>
+</header>
+<main>
+<div id="status"><div class="panel">Loading database…</div></div>
+<section id="browse">
+  <div class="controls">
+    <input id="q" type="search" placeholder="Search by name, #number or type…">
+    <select id="region"><option value="">All regions</option></select>
+    <select id="type"><option value="">All types</option></select>
+    <select id="sort">
+      <option value="id">Sort: Dex #</option><option value="name">Name</option>
+      <option value="total">Total stats</option>
+      <option value="HP">HP</option><option value="Attack">Attack</option><option value="Defense">Defense</option>
+      <option value="Sp. Atk">Sp. Atk</option><option value="Sp. Def">Sp. Def</option><option value="Speed">Speed</option>
+    </select>
+  </div>
+  <p class="hint" id="pickhint">Tip: press “Compare” on two cards to line them up.</p>
+  <div class="grid" id="grid"></div>
+</section>
+
+<section id="compare" hidden>
+  <div class="pickers"><select id="selA"></select><select id="selB"></select></div>
+  <div style="margin-bottom:14px" class="seg" id="mode"><button class="on" data-m="base">Base stats</button><button data-m="max">Max stats</button></div>
+  <div id="cmpOut"></div>
+</section>
+</main>
+
+<div class="dlg" id="dlg"><div class="box" id="dbox"></div></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+let DATA = [];
+let A=null,B=null,mode="base";
+const DB_FILE = "Database21.accdb";          // must sit next to index.html
+// mdb-reader (pure-JS Access reader) from a CDN; tried in order until one loads
+const READER_URLS = [
+  "https://cdn.jsdelivr.net/npm/mdb-reader@3.0.0/+esm",
+  "https://cdn.jsdelivr.net/npm/mdb-reader@2.2.1/+esm"
+];
+const BUFFER_URL = "https://cdn.jsdelivr.net/npm/buffer@6.0.3/+esm";
+
+function showError(title, detail){
+  $("#status").innerHTML = `<div class="panel"><h3 style="margin:0 0 6px;color:var(--accent)">${esc(title)}</h3><div>${detail}</div></div>`;
+  $("#status").hidden = false;
+}
+async function loadDatabase(){
+  if(location.protocol==="file:")
+    throw {title:"Open this through a web server", detail:`Browsers block pages from reading <code>${DB_FILE}</code> when opened by double-click (<code>file://</code>). Publish it on GitHub Pages, or run <code>python -m http.server</code> in this folder and open <code>http://localhost:8000</code>.`};
+  let res;
+  try{ res = await fetch(DB_FILE,{cache:"no-cache"}); }catch(e){ res = null; }
+  if(!res || !res.ok)
+    throw {title:"Database not found", detail:`Could not load <code>${DB_FILE}</code>. This site reads all of its data from that Access file, so the file must be in the same folder as <code>index.html</code>.`};
+  const bytes = new Uint8Array(await res.arrayBuffer());
+  const {Buffer} = await import(BUFFER_URL);
+  globalThis.Buffer = globalThis.Buffer || Buffer;
+  let MDBReader, lastErr;
+  for(const u of READER_URLS){ try{ const m = await import(u); MDBReader = m.default || m.MDBReader; if(MDBReader) break; }catch(e){ lastErr=e } }
+  if(!MDBReader) throw {title:"Couldn't load the Access reader library", detail:`Check your internet connection (it loads from jsDelivr). ${esc(lastErr?.message||"")}`};
+  let reader;
+  try{ reader = new MDBReader(Buffer.from(bytes)); }
+  catch(e){ throw {title:"Couldn't read the Access file", detail:esc(e.message)}; }
+  const rows = n => reader.getTable(n).getData();
+  const region = Object.fromEntries(rows("Region").map(r=>[r.RegionID,r.RegionName]));
+  const type   = Object.fromEntries(rows("PokemonType").map(r=>[r.TypeID,r.TypeName]));
+  const stats  = Object.fromEntries(rows("Stats").map(r=>[r.EntryID,r]));
+  const g = (s,k)=> s && s[k]!=null ? s[k] : null;
+  return rows("Pokemon").sort((a,b)=>a.EntryID-b.EntryID).map(p=>{
+    const s = stats[p.EntryID];
+    return {
+      PokemonID:p.PokemonCode, PokemonName:p.PokemonName,
+      Region:region[p.RegionID]||null, "Type 1":type[p.Type1ID]||null, "Type 2":type[p.Type2ID]||null,
+      HP:g(s,"HP"),Attack:g(s,"Attack"),Defense:g(s,"Defense"),"Sp. Atk":g(s,"SpAtk"),"Sp. Def":g(s,"SpDef"),Speed:g(s,"Speed"),
+      "Max HP":g(s,"MaxHP"),"Max Atk":g(s,"MaxAtk"),"Max Def":g(s,"MaxDef"),"Max Sp. Atk":g(s,"MaxSpAtk"),"Max Sp. Def":g(s,"MaxSpDef"),"Max Speed":g(s,"MaxSpeed")
+    };
+  });
+}
+const STATS = ["HP","Attack","Defense","Sp. Atk","Sp. Def","Speed"];
+const MAXK = {"HP":"Max HP","Attack":"Max Atk","Defense":"Max Def","Sp. Atk":"Max Sp. Atk","Sp. Def":"Max Sp. Def","Speed":"Max Speed"};
+const COLORS = {Normal:"#8a8a59",Fire:"#e8612b",Water:"#4a7de8",Electric:"#d9a90a",Grass:"#4fa83c",Ice:"#5bbcbc",Fighting:"#b52a24",Poison:"#9034a0",Ground:"#c9a44a",Flying:"#8a73d8",Psychic:"#e8457a",Bug:"#8fa018",Rock:"#9c862a",Ghost:"#5b4a85",Dragon:"#5a2ae8",Dark:"#5b4a3c",Steel:"#8a8aa6",Fairy:"#d97a92"};
+const num = p => parseInt(p.PokemonID.replace(/\D/g,"").split("-")[0],10);
+const isBase = p => /^#\d+$/.test(p.PokemonID);
+const types = p => [p["Type 1"],p["Type 2"]].filter(Boolean);
+const total = (p,max) => STATS.reduce((s,k)=>s+(max?p[MAXK[k]]:p[k])||0,0);
+const hasMax = p => p["Max HP"]!=null;
+const chips = p => `<div class="chips">${types(p).map(t=>`<span class="chip" style="background:${COLORS[t]||"#777"}">${esc(t)}</span>`).join("")}</div>`;
+// Official artwork from the PokéAPI sprite repo (only for base forms; falls back to a coloured circle offline)
+const img = (p,cls="") => isBase(p)
+  ? `<img ${cls} loading="lazy" alt="" src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${num(p)}.png" onerror="this.outerHTML='<div class=ph style=background:${COLORS[p["Type 1"]]}></div>'">`
+  : `<div class="ph" style="background:${COLORS[p["Type 1"]]}"></div>`;
+
+function init(){
+DATA.forEach((p,i)=>p._i=i);
+$("#count").textContent = `· ${DATA.length} Pokémon`;
+
+// filters
+[...new Set(DATA.map(p=>p.Region).filter(Boolean))].sort().forEach(r=>$("#region").add(new Option(r,r)));
+[...new Set(DATA.flatMap(types))].sort().forEach(t=>$("#type").add(new Option(t,t)));
+const optsHTML = DATA.slice().sort((a,b)=>a.PokemonName.localeCompare(b.PokemonName)).map(p=>`<option value="${p._i}">${esc(p.PokemonName)} (${esc(p.PokemonID)})</option>`).join("");
+$("#selA").innerHTML = optsHTML; $("#selB").innerHTML = optsHTML;
+
+}
+function render(){
+  const q=$("#q").value.trim().toLowerCase().replace(/^#/,""), r=$("#region").value, t=$("#type").value, s=$("#sort").value;
+  let list = DATA.filter(p=>
+    (!r||p.Region===r) && (!t||types(p).includes(t)) &&
+    (!q || p.PokemonName.toLowerCase().includes(q) || p.PokemonID.toLowerCase().replace("#","").includes(q) || types(p).some(x=>x.toLowerCase().includes(q))));
+  list.sort((a,b)=> s==="id"?num(a)-num(b)||a.PokemonID.localeCompare(b.PokemonID)
+    : s==="name"?a.PokemonName.localeCompare(b.PokemonName)
+    : s==="total"?total(b)-total(a) : b[s]-a[s]);
+  $("#grid").innerHTML = list.length ? list.map(p=>`
+    <div class="card" data-i="${p._i}">
+      <div class="id">${esc(p.PokemonID)}${p.Region?" · "+esc(p.Region):""}</div>
+      <span class="tot">${total(p)}</span>
+      ${img(p)}
+      <div class="nm">${esc(p.PokemonName)}</div>${chips(p)}
+      <button class="cmp ${A===p._i?"sel":B===p._i?"sel b":""}" data-c="${p._i}">${A===p._i?"Slot A":B===p._i?"Slot B":"Compare"}</button>
+    </div>`).join("") : `<div class="empty">No Pokémon match that search.</div>`;
+}
+function bars(p,max){
+  return STATS.map(k=>{const v=max?p[MAXK[k]]:p[k];return `<div class="bar"><span>${k}</span><b>${v??"—"}</b><div class="track"><i style="width:${Math.min(100,(v||0)/255*100)}%;background:${COLORS[p["Type 1"]]}"></i></div></div>`}).join("");
+}
+function detail(i){
+  const p=DATA[i];
+  $("#dbox").innerHTML = `<button class="x" onclick="$('#dlg').classList.remove('show')">×</button>
+    <div class="hd">${img(p)}<div><div class="hint">${esc(p.PokemonID)}${p.Region?" · "+esc(p.Region):""}</div><h2 style="margin:0">${esc(p.PokemonName)}</h2>${chips(p)}</div></div>
+    <h4>Base stats <span class="hint">(total ${total(p)})</span></h4>${bars(p,false)}
+    ${hasMax(p)?`<h4>Max stats <span class="hint">(total ${total(p,true)})</span></h4>${bars(p,true)}`:`<p class="hint">No max stats in the spreadsheet for this one.</p>`}`;
+  $("#dlg").classList.add("show");
+}
+function radar(a,b,max){
+  const n=STATS.length,R=90,cx=130,cy=120,top=max?300:255;
+  const pt=(k,v)=>{const ang=-Math.PI/2+k*2*Math.PI/n;return [cx+Math.cos(ang)*R*v/top,cy+Math.sin(ang)*R*v/top]};
+  const poly=p=>STATS.map((s,k)=>pt(k,(max?p[MAXK[s]]:p[s])||0).join(",")).join(" ");
+  const rings=[.25,.5,.75,1].map(f=>`<polygon points="${STATS.map((_,k)=>pt(k,top*f).join(",")).join(" ")}" fill="none" stroke="var(--line)"/>`).join("");
+  const labels=STATS.map((s,k)=>{const [x,y]=pt(k,top*1.2);return `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="middle">${s}</text>`}).join("");
+  return `<svg viewBox="0 0 260 240" style="max-width:340px;width:100%;display:block;margin:auto">${rings}${labels}
+   <polygon points="${poly(a)}" fill="var(--a)" fill-opacity=".25" stroke="var(--a)" stroke-width="2"/>
+   <polygon points="${poly(b)}" fill="var(--b)" fill-opacity=".25" stroke="var(--b)" stroke-width="2"/></svg>`;
+}
+function renderCompare(){
+  if(A==null||B==null){ $("#cmpOut").innerHTML=`<div class="empty">Pick two Pokémon above.</div>`; return }
+  const a=DATA[A],b=DATA[B],max=mode==="max";
+  const val=(p,k)=>max?p[MAXK[k]]:p[k];
+  const row=(k)=>{const x=val(a,k),y=val(b,k),m=max?300:255;
+    return `<div class="row">
+      <div class="side l"><b class="${x>y?"win A":""}">${x??"—"}</b><div class="tr"><i style="width:${(x||0)/m*100}%;background:var(--a)"></i></div></div>
+      <div class="lbl">${k}</div>
+      <div class="side"><b class="${y>x?"win B":""}">${y??"—"}</b><div class="tr"><i style="width:${(y||0)/m*100}%;background:var(--b)"></i></div></div></div>`};
+  const ta=total(a,max),tb=total(b,max);
+  const head=(p,c)=>`<div class="hd ${c}" style="${c==="B"?"flex-direction:row-reverse;text-align:right":""}">${img(p)}<div><div class="${c}" style="font-weight:700;font-size:18px">${esc(p.PokemonName)}</div>${chips(p)}</div></div>`;
+  let note = max && (!hasMax(a)||!hasMax(b)) ? `<p class="hint">Max stats are missing in the spreadsheet for one of these Pokémon.</p>`:"";
+  $("#cmpOut").innerHTML = `<div class="panel">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">${head(a,"A")}${head(b,"B")}</div>
+    ${STATS.map(row).join("")}
+    <div class="row"><div class="side l"><b class="${ta>tb?"win A":""}">${ta}</b></div><div class="lbl"><b>Total</b></div><div class="side"><b class="${tb>ta?"win B":""}">${tb}</b></div></div>
+    ${note}</div>
+    <div class="panel">${radar(a,b,max)}</div>
+    <p class="hint">Outlined number = higher stat. ${ta===tb?"Totals are tied.":`<b>${esc((ta>tb?a:b).PokemonName)}</b> has the higher total (${Math.abs(ta-tb)} points).`}</p>`;
+}
+function setSlot(i){
+  if(A===i){A=null}else if(B===i){B=null}else if(A==null){A=i}else if(B==null){B=i}else{A=B;B=i}
+  if(A!=null)$("#selA").value=A; if(B!=null)$("#selB").value=B;
+  const n=(A!=null)+(B!=null);
+  $("#pickhint").textContent = n===2?"Two selected — open the Compare tab.":n===1?"One selected — choose a second Pokémon.":"Tip: press “Compare” on two cards to line them up.";
+  render();
+}
+function tab(t){
+  document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("on",b.dataset.t===t));
+  $("#browse").hidden=t!=="browse"; $("#compare").hidden=t!=="compare";
+  if(t==="compare"){A=A??+$("#selA").value;B=B??+$("#selB").value;$("#selA").value=A;$("#selB").value=B;renderCompare()} else render();
+}
+document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>tab(b.dataset.t));
+["q","region","type","sort"].forEach(id=>$("#"+id).addEventListener("input",render));
+$("#grid").addEventListener("click",e=>{
+  const c=e.target.closest("[data-c]"); if(c){e.stopPropagation();return setSlot(+c.dataset.c)}
+  const card=e.target.closest(".card"); if(card)detail(+card.dataset.i);
+});
+$("#selA").onchange=e=>{A=+e.target.value;renderCompare()};
+$("#selB").onchange=e=>{B=+e.target.value;renderCompare()};
+$("#mode").onclick=e=>{const m=e.target.dataset.m;if(!m)return;mode=m;document.querySelectorAll("#mode button").forEach(b=>b.classList.toggle("on",b.dataset.m===m));renderCompare()};
+$("#dlg").onclick=e=>{if(e.target.id==="dlg")e.target.classList.remove("show")};
+$("#browse").hidden = true;
+(async()=>{
+  try{
+    DATA = await loadDatabase();
+    if(!DATA.length) throw {title:"The database is empty", detail:"The Pokemon table has no rows."};
+    DATA.forEach((p,i)=>p._i=i);
+    init(); $("#status").hidden=true; $("#browse").hidden=false; render();
+  }catch(e){ showError(e.title||"Something went wrong", e.detail||esc(e.message||e)); }
+})();
+</script>
+</body>
+</html>
